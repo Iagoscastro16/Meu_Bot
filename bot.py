@@ -1,4 +1,5 @@
 from telegram import Update
+from telegram.constants import ChatAction
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 from openai import AsyncOpenAI
 from dotenv import dotenv_values
@@ -18,6 +19,8 @@ client = AsyncOpenAI(base_url="http://localhost:3001/v1",api_key=(token_free))
 
 async def ecoar(update:Update, context: ContextTypes.DEFAULT_TYPE):
     texto = update.message.text
+
+    await update.message.chat.send_action(ChatAction.TYPING)
 
     r = await client.chat.completions.create(
         model="auto:fast",
