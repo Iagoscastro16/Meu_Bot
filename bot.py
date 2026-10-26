@@ -27,7 +27,7 @@ async def ecoar(update:Update, context: ContextTypes.DEFAULT_TYPE):
 
     resposta = r.choices[0].message.content
 
-    await update.message.reply_text(resposta.strip)
+    await update.message.reply_text(resposta.strip())
 
 # dizer para o python onde pegar as informações 
 
