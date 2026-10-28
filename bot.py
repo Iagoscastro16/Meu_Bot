@@ -5,12 +5,14 @@ from openai import AsyncOpenAI,APIConnectionError,APITimeoutError,RateLimitError
 import asyncio
 from dotenv import dotenv_values
 
-# chamar a variavel de ambiente
+# chama as variaveis de ambiente
 config = dotenv_values(".env")
 
 token = config["TELEGRAM_TOKEN"]
 
 token_free= config["freellmapi"]
+
+meu_id = int(config["id_user_telegram"])
 
 #chamar o cliente da open ia para o freellm
 
@@ -19,7 +21,13 @@ client = AsyncOpenAI(base_url="http://localhost:3001/v1",api_key=(token_free))
 # Função que faz a comunicação
 
 async def ecoar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # verificação se quem está enviando a mensagem sou eu mesmo
+    if update.effective_user.id != meu_id:
+        print(f"Mensagem ignorada de {update.effective_user.id}")
+        return
+
     texto = update.message.text
+    
     await update.message.chat.send_action(ChatAction.TYPING)
 
     try:
