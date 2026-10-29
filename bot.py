@@ -1,18 +1,33 @@
 from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
-from openai import AsyncOpenAI,APIConnectionError,APITimeoutError,RateLimitError,AuthenticationError,APIStatusError
+from telegram.error import InvalidToken
+from openai import AsyncOpenAI,APIConnectionError,APITimeoutError,RateLimitError,AuthenticationError,APIStatusError,InternalServerError
 import asyncio
+import os
+import sys
 from dotenv import dotenv_values
 
 # chama as variaveis de ambiente
+if not os.path.exists(".env"):
+    sys.exit("Arquivo .env não encontrado. Crie o .env na pasta do bot.")
+
 config = dotenv_values(".env")
+
+# confere se todas as chaves existem e não estão vazias
+chaves = ["TELEGRAM_TOKEN", "freellmapi", "id_user_telegram"]
+faltando = [chave for chave in chaves if not config.get(chave)]
+if faltando:
+    sys.exit(f"Faltando no .env (ou vazio): {', '.join(faltando)}")
 
 token = config["TELEGRAM_TOKEN"]
 
 token_free= config["freellmapi"]
 
-meu_id = int(config["id_user_telegram"])
+try:
+    meu_id = int(config["id_user_telegram"])
+except ValueError:
+    sys.exit("id_user_telegram no .env precisa ser um número.")
 
 #chamar o cliente da open ia para o freellm
 
@@ -74,4 +89,7 @@ app = ApplicationBuilder().token(token).build()
 
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ecoar))
 
-app.run_polling()
+try:
+    app.run_polling()
+except InvalidToken:
+    sys.exit("TELEGRAM_TOKEN inválido, confere o .env")
