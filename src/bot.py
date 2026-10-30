@@ -5,7 +5,7 @@ from telegram.error import InvalidToken
 import sys
 from config import token, meu_id
 from src.log import logger, log_da_requisicao
-from src.ia import perguntar, ErroIA, MODELO
+from src.ia import perguntar, ErroIA
 from src.memoria import ultimas, salvar
 
 # quantas mensagens anteriores (pergunta + resposta contam como 2) vão para a IA
@@ -21,21 +21,23 @@ async def ecoar(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # cada requisição ganha o seu registro no banco de log
-    with log_da_requisicao(MODELO) as requisicao:
+    with log_da_requisicao() as requisicao:
         texto = update.message.text
         logger.info("Mensagem recebida (%d caracteres)", len(texto))
 
         await update.message.chat.send_action(ChatAction.TYPING)
 
         try:
-            resposta = await perguntar(texto, ultimas(MENSAGENS_NA_MEMORIA))
+            resposta, requisicao.modelo = await perguntar(texto, ultimas(MENSAGENS_NA_MEMORIA))
         except ErroIA as erro:
             # deu errado: avisa o usuário e não grava nada na memória
             requisicao.resultado = erro.tipo
             await update.message.reply_text(erro.mensagem)
             return
 
-        await update.message.reply_text(resposta)
+        # o rodapé só vai para o Telegram; na memória fica a resposta pura
+        rodape = f"\n\nRespondido por {requisicao.modelo}" if requisicao.modelo else ""
+        await update.message.reply_text(resposta + rodape)
         requisicao.resultado = "sucesso"
         logger.info("Resposta enviada (%d caracteres)", len(resposta))
 

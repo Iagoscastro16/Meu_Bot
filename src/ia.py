@@ -16,10 +16,11 @@ class ErroIA(Exception):
 
 MODELO = "auto:fast"
 
-# manda a pergunta (com o histórico, se tiver) para a IA e devolve o texto da resposta
+# manda a pergunta (com o histórico, se tiver) para a IA e devolve (texto da resposta, modelo que respondeu)
+# o modelo vem da própria resposta, porque o "auto:fast" do FreeLLMAPI escolhe um modelo diferente a cada vez
 # só retorna quando deu certo; em qualquer falha levanta ErroIA
 
-async def perguntar(texto: str, historico: list[dict] | None = None) -> str:
+async def perguntar(texto: str, historico: list[dict] | None = None) -> tuple[str, str | None]:
     mensagens = (historico or []) + [{"role": "user", "content": texto}]
 
     try:
@@ -61,4 +62,4 @@ async def perguntar(texto: str, historico: list[dict] | None = None) -> str:
         logger.warning("A IA devolveu resposta vazia")
         raise ErroIA("A IA não devolveu texto. Tenta de novo.", "sem_resposta")
 
-    return resposta.strip()
+    return resposta.strip(), r.model or None

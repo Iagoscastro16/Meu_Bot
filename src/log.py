@@ -94,9 +94,11 @@ class Requisicao:
         self.id = id
         # se o bot quebrar antes de definir o resultado, fica registrado como "excecao"
         self.resultado = "excecao"
+        # modelo que respondeu; fica vazio se a IA não chegou a responder
+        self.modelo = None
 
 @contextmanager
-def log_da_requisicao(modelo: str):
+def log_da_requisicao():
     # tudo que for logado dentro do "with" vai para o banco ligado a esta requisição
     # (um problema no banco de log nunca pode derrubar o bot, só aparece no terminal)
     inicio = time.monotonic()
@@ -104,8 +106,8 @@ def log_da_requisicao(modelo: str):
     try:
         with closing(_conectar()) as conexao, conexao:
             cursor = conexao.execute(
-                "INSERT INTO requisicoes (criada_em, resultado, modelo) VALUES (?, ?, ?)",
-                (datetime.now(FUSO).strftime(FORMATO_DATA), "em_andamento", modelo),
+                "INSERT INTO requisicoes (criada_em, resultado) VALUES (?, ?)",
+                (datetime.now(FUSO).strftime(FORMATO_DATA), "em_andamento"),
             )
             requisicao = Requisicao(cursor.lastrowid)
     except Exception:
@@ -121,8 +123,8 @@ def log_da_requisicao(modelo: str):
             try:
                 with closing(_conectar()) as conexao, conexao:
                     conexao.execute(
-                        "UPDATE requisicoes SET resultado = ?, duracao_ms = ? WHERE id = ?",
-                        (requisicao.resultado, int((time.monotonic() - inicio) * 1000), requisicao.id),
+                        "UPDATE requisicoes SET resultado = ?, duracao_ms = ?, modelo = ? WHERE id = ?",
+                        (requisicao.resultado, int((time.monotonic() - inicio) * 1000), requisicao.modelo, requisicao.id),
                     )
             except Exception:
                 logger.exception("Não consegui fechar a requisição no banco de log")
