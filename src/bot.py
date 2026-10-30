@@ -5,7 +5,11 @@ from telegram.error import InvalidToken
 import sys
 from config import token, meu_id
 from src.log import logger, log_da_requisicao
-from src.ia import perguntar
+from src.ia import perguntar, ErroIA
+from src.memoria import ultimas, salvar
+
+# quantas mensagens anteriores (pergunta + resposta contam como 2) vão para a IA
+MENSAGENS_NA_MEMORIA = 20
 
 # Função que faz a comunicação
 
@@ -23,10 +27,21 @@ async def ecoar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await update.message.chat.send_action(ChatAction.TYPING)
 
-        resposta = await perguntar(texto)
+        try:
+            resposta = await perguntar(texto, ultimas(MENSAGENS_NA_MEMORIA))
+        except ErroIA as erro:
+            # deu errado: avisa o usuário e não grava nada na memória
+            await update.message.reply_text(erro.mensagem)
+            return
 
         await update.message.reply_text(resposta)
         logger.info("Resposta enviada (%d caracteres)", len(resposta))
+
+        # deu certo e o usuário recebeu: agora sim grava
+        try:
+            salvar(texto, resposta)
+        except Exception as e:
+            logger.exception("Não consegui gravar na memória: %s", e)
 
 # dizer para o python onde pegar as informações
 

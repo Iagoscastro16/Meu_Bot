@@ -6,43 +6,55 @@ from src.log import logger
 
 client = AsyncOpenAI(base_url="http://localhost:3001/v1", api_key=token_free)
 
-# manda a pergunta para a IA e devolve o texto que vai para o usuário
-# (a resposta da IA, ou uma mensagem amigável se algo der errado)
+# levantada quando a IA não conseguiu responder; carrega a mensagem amigável para o usuário
+class ErroIA(Exception):
+    def __init__(self, mensagem: str):
+        super().__init__(mensagem)
+        self.mensagem = mensagem
 
-async def perguntar(texto: str) -> str:
+# manda a pergunta (com o histórico, se tiver) para a IA e devolve o texto da resposta
+# só retorna quando deu certo; em qualquer falha levanta ErroIA
+
+async def perguntar(texto: str, historico: list[dict] | None = None) -> str:
+    mensagens = (historico or []) + [{"role": "user", "content": texto}]
+
     try:
         r = await client.chat.completions.create(
             model="auto:fast",
-            messages=[{"role": "user", "content": texto}],
+            messages=mensagens,
             timeout=60,
         )
     except APITimeoutError:
         logger.warning("Timeout na chamada da IA")
-        return "A IA demorou demais. Tenta de novo."
+        raise ErroIA("A IA demorou demais. Tenta de novo.")
 
     except APIConnectionError:
         logger.error("Não conectou no serviço de IA")
-        return "O serviço de IA está fora do ar."
+        raise ErroIA("O serviço de IA está fora do ar.")
 
     except RateLimitError:
         logger.warning("Limite de uso da IA atingido")
-        return "Limite de uso atingido. Tenta daqui a pouco."
+        raise ErroIA("Limite de uso atingido. Tenta daqui a pouco.")
 
     except AuthenticationError:
         logger.error("Chave do FreeLLMAPI inválida, confere o .env")
-        return "Erro de configuração do bot."
+        raise ErroIA("Erro de configuração do bot.")
 
     except InternalServerError:
         logger.error("Erro interno do lado da IA")
-        return "A IA deu erro do lado dela. Tenta de novo."
+        raise ErroIA("A IA deu erro do lado dela. Tenta de novo.")
 
     except Exception as e:
         logger.exception("Erro inesperado: %s", e)
-        return "Algo deu errado."
+        raise ErroIA("Algo deu errado.")
+
+    if not r.choices:
+        logger.warning("A IA devolveu a lista de choices vazia")
+        raise ErroIA("A IA não devolveu texto. Tenta de novo.")
 
     resposta = r.choices[0].message.content
     if not resposta or not resposta.strip():
         logger.warning("A IA devolveu resposta vazia")
-        return "A IA não devolveu texto. Tenta de novo."
+        raise ErroIA("A IA não devolveu texto. Tenta de novo.")
 
     return resposta.strip()
