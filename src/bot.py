@@ -5,7 +5,7 @@ from telegram.error import InvalidToken
 import sys
 from config import token, meu_id
 from src.log import logger, log_da_requisicao
-from src.ia import perguntar, ErroIA
+from src.ia import perguntar, ErroIA, MODELO
 from src.memoria import ultimas, salvar
 
 # quantas mensagens anteriores (pergunta + resposta contam como 2) vão para a IA
@@ -15,13 +15,13 @@ MENSAGENS_NA_MEMORIA = 20
 
 async def ecoar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # verificação se quem está enviando a mensagem sou eu mesmo
-    # (mensagens de estranhos não geram arquivo, só aviso no terminal)
+    # (mensagens de estranhos não geram registro, só aviso no terminal)
     if update.effective_user.id != meu_id:
         logger.warning("Mensagem ignorada de %s", update.effective_user.id)
         return
 
-    # cada requisição ganha o seu próprio arquivo de log
-    with log_da_requisicao():
+    # cada requisição ganha o seu registro no banco de log
+    with log_da_requisicao(MODELO) as requisicao:
         texto = update.message.text
         logger.info("Mensagem recebida (%d caracteres)", len(texto))
 
@@ -31,10 +31,12 @@ async def ecoar(update: Update, context: ContextTypes.DEFAULT_TYPE):
             resposta = await perguntar(texto, ultimas(MENSAGENS_NA_MEMORIA))
         except ErroIA as erro:
             # deu errado: avisa o usuário e não grava nada na memória
+            requisicao.resultado = erro.tipo
             await update.message.reply_text(erro.mensagem)
             return
 
         await update.message.reply_text(resposta)
+        requisicao.resultado = "sucesso"
         logger.info("Resposta enviada (%d caracteres)", len(resposta))
 
         # deu certo e o usuário recebeu: agora sim grava
